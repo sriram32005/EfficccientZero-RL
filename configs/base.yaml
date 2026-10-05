@@ -1,0 +1,123 @@
+# ======================================================================================
+# Shared configuration. Game-specific files (pong.yaml, breakout.yaml) inherit from this
+# with `_base_: base.yaml` and override only what they need.
+# ======================================================================================
+seed: 0
+device: auto          # auto | cuda | cpu | mps
+output_dir: runs
+
+env:
+  game: Pong          # ALE game name, e.g. Pong, Breakout, MsPacman
+  size: 96            # EfficientZero observation size
+  grayscale: true
+  stack: 4
+  skip: 4             # frame skip (action repeat)
+  episodic_life: true
+  sticky_actions: 0.0 # 0.0 = deterministic ALE (the Atari-100k convention)
+  max_episode_steps: 27000
+  eval_max_episode_steps: 27000
+
+# -------------------------------------------------------------------------------------
+# EfficientZero network
+# -------------------------------------------------------------------------------------
+model:
+  channels: 64          # latent state channels
+  blocks: 1             # residual blocks per tower (paper uses 1 for Atari-100k)
+  reduced_channels: 16  # 1x1 bottleneck before the value/policy/prefix heads
+  fc_hidden: 32
+  lstm_hidden: 512      # value-prefix LSTM
+  proj_dim: 1024        # SimSiam projection width
+  support_size: 20      # categorical value/reward support -> 41 bins
+  downsample: true      # 96x96 -> 6x6
+
+mcts:
+  num_simulations: 50
+  discount: 0.997
+  pb_c_base: 19652
+  pb_c_init: 1.25
+  root_dirichlet_alpha: 0.3
+  root_exploration_fraction: 0.25
+  lstm_horizon_len: 5   # reset the value-prefix LSTM every 5 levels
+
+selfplay:
+  num_envs: 8           # searched as one batch -> bigger = better GPU utilisation
+  segment_length: 200   # trajectory segment length stored in the buffer
+
+train:
+  batch_size: 64
+  num_unroll_steps: 5   # K
+  td_steps: 5           # n-step value target
+  optimizer: sgd        # sgd | adam
+  lr_init: 0.2
+  momentum: 0.9
+  weight_decay: 0.0001
+  lr_warmup_steps: 1000
+  lr_decay_rate: 0.1
+  lr_decay_steps: 100000
+  max_grad_norm: 5
+  value_loss_coeff: 0.25
+  policy_loss_coeff: 1.0
+  reward_loss_coeff: 1.0
+  consistency_loss_coeff: 2.0   # the self-supervised term
+  per_alpha: 0.6
+  per_beta: 0.4
+  reanalyze_ratio: 0.0          # >0 recomputes policy targets with fresh MCTS (slower)
+  target_update_interval: 200   # gradient steps
+
+ez:
+  total_env_steps: 120000
+  start_transitions: 2000       # warm-up self-play before the first gradient step
+  collect_steps: 200            # env steps between learner phases
+  updates_per_collect: 200      # gradient steps per learner phase
+  buffer_capacity: 200000
+  eval_interval: 10000
+  eval_episodes: 2
+  checkpoints: [20000, 50000, 100000]
+
+# -------------------------------------------------------------------------------------
+# DQN (double + dueling + n-step) -- the model-free baseline
+# -------------------------------------------------------------------------------------
+dqn:
+  size: 84
+  stack: 4
+  dueling: true
+  n_step: 3
+  gamma: 0.99
+  lr: 0.0001
+  batch_size: 32
+  buffer_capacity: 200000
+  learning_starts: 20000
+  train_freq: 4
+  target_update_interval: 2000  # gradient steps
+  exploration_steps: 250000
+  final_epsilon: 0.01
+  max_grad_norm: 10
+  total_env_steps: 3000000
+  eval_interval: 100000
+  eval_episodes: 3
+  log_interval: 1000
+  checkpoints: [20000, 50000, 100000, 3000000]
+
+# -------------------------------------------------------------------------------------
+# Demo assembly
+# -------------------------------------------------------------------------------------
+demo:
+  out_dir: demo_out
+  fps: 30
+  seed: 11
+  episodes_per_checkpoint: 3
+  showcase_simulations: 100     # deeper search for the final "inside the planner" clip
+  dqn_converged_step: 3000000
+  pairs:
+    - name: early-learning
+      ez_step: 20000
+      dqn_step: 20000
+      note: "20k env steps: EfficientZero is already tracking the ball, DQN is still random"
+    - name: mid-training
+      ez_step: 50000
+      dqn_step: 50000
+      note: "50k env steps: EfficientZero rallies, DQN has barely moved off the floor"
+    - name: efficientzero-converged
+      ez_step: 100000
+      dqn_step: 100000
+      note: "100k env steps: EfficientZero plays near-optimally, DQN still cannot return the ball"

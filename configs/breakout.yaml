@@ -1,0 +1,31 @@
+# Breakout: EfficientZero reaches a decent score in ~100k steps; DQN needs ~10M for a
+# comparable score, so budget the DQN run accordingly (or stop it earlier and say so).
+_base_: base.yaml
+
+env:
+  game: Breakout
+
+ez:
+  total_env_steps: 120000
+  checkpoints: [20000, 50000, 100000]
+
+dqn:
+  total_env_steps: 5000000
+  exploration_steps: 1000000
+  checkpoints: [20000, 50000, 100000, 1000000, 3000000, 5000000]
+
+demo:
+  dqn_converged_step: 5000000
+  pairs:
+    - name: early-learning
+      ez_step: 20000
+      dqn_step: 20000
+      note: "20k env steps: EfficientZero has learned to aim, DQN flails"
+    - name: mid-training
+      ez_step: 50000
+      dqn_step: 50000
+      note: "50k env steps: EfficientZero clears rows, DQN scores by accident"
+    - name: efficientzero-converged
+      ez_step: 100000
+      dqn_step: 100000
+      note: "100k env steps: EfficientZero tunnels through the wall, DQN is still warming up"

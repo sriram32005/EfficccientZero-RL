@@ -1,0 +1,9 @@
+torch>=2.1
+gymnasium>=0.29
+ale-py>=0.10
+numpy>=1.24
+opencv-python>=4.8
+imageio>=2.31
+imageio-ffmpeg>=0.4.9
+matplotlib>=3.7
+PyYAML>=6.0

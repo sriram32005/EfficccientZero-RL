@@ -1,0 +1,45 @@
+# Cheap profile for a laptop / short GPU budget. Lower search depth and a smaller
+# network: the qualitative story still holds, the absolute scores are lower.
+_base_: pong.yaml
+
+model:
+  channels: 32
+  lstm_hidden: 256
+  proj_dim: 512
+
+mcts:
+  num_simulations: 25
+
+selfplay:
+  num_envs: 8
+
+train:
+  batch_size: 32
+
+ez:
+  total_env_steps: 60000
+  updates_per_collect: 100
+  checkpoints: [10000, 25000, 50000]
+
+dqn:
+  total_env_steps: 1000000
+  exploration_steps: 150000
+  checkpoints: [10000, 25000, 50000, 500000, 1000000]
+
+demo:
+  showcase_simulations: 50
+  dqn_converged_step: 1000000
+  episodes_per_checkpoint: 2
+  pairs:
+    - name: early-learning
+      ez_step: 10000
+      dqn_step: 10000
+      note: "10k env steps"
+    - name: mid-training
+      ez_step: 25000
+      dqn_step: 25000
+      note: "25k env steps"
+    - name: efficientzero-converged
+      ez_step: 50000
+      dqn_step: 50000
+      note: "50k env steps"

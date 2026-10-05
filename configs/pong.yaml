@@ -1,0 +1,17 @@
+# Pong is the recommended demo game: EfficientZero is near-optimal at ~100k env steps,
+# while DQN needs millions -- the contrast is obvious to a room full of people.
+_base_: base.yaml
+
+env:
+  game: Pong
+
+ez:
+  total_env_steps: 120000
+  checkpoints: [20000, 50000, 100000]
+
+dqn:
+  total_env_steps: 3000000
+  checkpoints: [20000, 50000, 100000, 1000000, 2000000, 3000000]
+
+demo:
+  dqn_converged_step: 3000000
