@@ -44,7 +44,7 @@ def evaluate(
     kwargs = {"seed": seed}
     if agent_type == "ez":
         kwargs.update({"num_simulations": sims, "temperature": temperature})
-    else:
+    elif agent_type == "dqn":
         kwargs.update({"epsilon": epsilon})
     agent = load_agent(ckpt_path, device=device, **kwargs)
 

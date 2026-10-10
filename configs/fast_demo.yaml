@@ -21,25 +21,33 @@ ez:
   updates_per_collect: 100
   checkpoints: [10000, 25000, 50000]
 
-dqn:
+# dqn:
+#   total_env_steps: 1000000
+#   exploration_steps: 150000
+#   checkpoints: [10000, 25000, 50000, 500000, 1000000]
+
+reinforce:
   total_env_steps: 1000000
-  exploration_steps: 150000
   checkpoints: [10000, 25000, 50000, 500000, 1000000]
 
 demo:
   showcase_simulations: 50
-  dqn_converged_step: 1000000
+  reinforce_converged_step: 1000000
+  # dqn_converged_step: 1000000
   episodes_per_checkpoint: 2
   pairs:
     - name: early-learning
       ez_step: 10000
-      dqn_step: 10000
+      reinforce_step: 10000
+      # dqn_step: 10000
       note: "10k env steps"
     - name: mid-training
       ez_step: 25000
-      dqn_step: 25000
+      reinforce_step: 25000
+      # dqn_step: 25000
       note: "25k env steps"
     - name: efficientzero-converged
       ez_step: 50000
-      dqn_step: 50000
+      reinforce_step: 50000
+      # dqn_step: 50000
       note: "50k env steps"

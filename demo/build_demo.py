@@ -4,7 +4,7 @@
 
 Produces, under `demo_out/`:
   videos/<label>.mp4          one clip per checkpoint (game + live decision panel)
-  pairs/<label>.mp4           EfficientZero vs DQN side by side at the same env-step budget
+  pairs/<label>.mp4           EfficientZero vs REINFORCE side by side at the same env-step budget
   showcase_efficientzero.mp4  the converged EfficientZero with the full planning overlay
   demo_reel.mp4               everything above stitched together with title cards
   metrics.json / metrics.md   the numbers
@@ -43,7 +43,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="configs/pong.yaml")
     ap.add_argument("--ez-run", default=None)
-    ap.add_argument("--dqn-run", default=None)
+    ap.add_argument("--reinforce-run", default=None)
     ap.add_argument("--out", default=None)
     ap.add_argument("--episodes", type=int, default=None, help="episodes per checkpoint for the metrics")
     ap.add_argument("--showcase-sims", type=int, default=None, help="MCTS simulations for the final showcase clip")
@@ -54,31 +54,31 @@ def main():
     cfg = load_config(args.config, parse_overrides(args.set))
     game = cfg.env.game
     ez_run = args.ez_run or os.path.join(cfg.output_dir, f"ez_{game.lower()}")
-    dqn_run = args.dqn_run or os.path.join(cfg.output_dir, f"dqn_{game.lower()}")
+    reinforce_run = args.reinforce_run or os.path.join(cfg.output_dir, f"reinforce_{game.lower()}")
     out = ensure_dir(args.out or cfg.demo.out_dir)
     episodes = args.episodes or int(cfg.demo.episodes_per_checkpoint)
     device = get_device(cfg.device)
 
     ez_manifest = load_manifest(ez_run)
-    dqn_manifest = load_manifest(dqn_run)
+    reinforce_manifest = load_manifest(reinforce_run)
 
-    # ---- resolve the 7 demo checkpoints ---------------------------------------------
+    # ---- resolve the demo checkpoints ------------------------------------------------
     plan = []
     for pair in cfg.demo.pairs:
         ez_ck = nearest(ez_manifest, int(pair.ez_step))
-        dq_ck = nearest(dqn_manifest, int(pair.dqn_step))
+        rf_ck = nearest(reinforce_manifest, int(pair.reinforce_step))
         plan.append({
             "stage": pair.name,
             "note": pair.note,
             "ez": {"path": ez_ck["path"], "steps": ez_ck["env_steps"]},
-            "dqn": {"path": dq_ck["path"], "steps": dq_ck["env_steps"]},
+            "reinforce": {"path": rf_ck["path"], "steps": rf_ck["env_steps"]},
         })
-    dqn_final = nearest(dqn_manifest, int(cfg.demo.dqn_converged_step))
+    reinforce_final = nearest(reinforce_manifest, int(cfg.demo.reinforce_converged_step))
 
     print("=== demo plan ===")
     for p in plan:
-        print(f"  {p['stage']:<22} EZ@{p['ez']['steps']:>9,}   DQN@{p['dqn']['steps']:>9,}")
-    print(f"  {'dqn-converged':<22} {'':>12}   DQN@{dqn_final['env_steps']:>9,}")
+        print(f"  {p['stage']:<22} EZ@{p['ez']['steps']:>9,}   REINFORCE@{p['reinforce']['steps']:>9,}")
+    print(f"  {'reinforce-converged':<22} {'':>12}   REINFORCE@{reinforce_final['env_steps']:>9,}")
 
     ensure_dir(os.path.join(out, "videos"))
     ensure_dir(os.path.join(out, "pairs"))
@@ -103,27 +103,27 @@ def main():
         metrics.append(m)
         return m
 
-    # ---- 1. the six paired checkpoints ----------------------------------------------
+    # ---- 1. the paired checkpoints ---------------------------------------------------
     pair_clips = []
     for p in plan:
         ez_label = f"EfficientZero @ {p['ez']['steps']:,}"
-        dq_label = f"DQN @ {p['dqn']['steps']:,}"
+        rf_label = f"REINFORCE @ {p['reinforce']['steps']:,}"
         ez_m = run_one(p["ez"]["path"], ez_label, f"ez_{p['ez']['steps']}")
-        dq_m = run_one(p["dqn"]["path"], dq_label, f"dqn_{p['dqn']['steps']}")
+        rf_m = run_one(p["reinforce"]["path"], rf_label, f"reinforce_{p['reinforce']['steps']}")
         if not args.skip_videos:
             clip = compose.side_by_side(
-                [ez_m["video"], dq_m["video"]],
-                [ez_label, dq_label],
+                [ez_m["video"], rf_m["video"]],
+                [ez_label, rf_label],
                 os.path.join(out, "pairs", f"{p['stage']}.mp4"),
                 header_text=f"{game} -- {p['stage']}",
-                subtitle=f"{p['note']}   |   EfficientZero {ez_m['return_mean']:.1f}   vs   DQN {dq_m['return_mean']:.1f}",
+                subtitle=f"{p['note']}   |   EfficientZero {ez_m['return_mean']:.1f}   vs   REINFORCE {rf_m['return_mean']:.1f}",
                 fps=int(cfg.demo.fps),
             )
             pair_clips.append((p, clip))
 
-    # ---- 2. DQN at its own convergence point ----------------------------------------
-    dqn_final_label = f"DQN @ {dqn_final['env_steps']:,} (converged)"
-    dqn_final_m = run_one(dqn_final["path"], dqn_final_label, f"dqn_final_{dqn_final['env_steps']}")
+    # ---- 2. REINFORCE at its own convergence point -----------------------------------
+    reinforce_final_label = f"REINFORCE @ {reinforce_final['env_steps']:,} (converged)"
+    reinforce_final_m = run_one(reinforce_final["path"], reinforce_final_label, f"reinforce_final_{reinforce_final['env_steps']}")
 
     # ---- 3. showcase: converged EfficientZero with deeper search ---------------------
     ez_best = nearest(ez_manifest, int(cfg.demo.pairs[-1].ez_step))
@@ -150,14 +150,14 @@ def main():
         json.dump(metrics, f, indent=2)
 
     ez_scores = [m for m in metrics if m["agent"] == "ez"]
-    dq_scores = [m for m in metrics if m["agent"] == "dqn"]
+    rf_scores = [m for m in metrics if m["agent"] == "reinforce"]
     best_ez = max(ez_scores, key=lambda m: m["return_mean"]) if ez_scores else None
     matched = None
     if best_ez:
-        reached = [m for m in dq_scores if m["return_mean"] >= best_ez["return_mean"] - 1e-6]
+        reached = [m for m in rf_scores if m["return_mean"] >= best_ez["return_mean"] - 1e-6]
         matched = min(reached, key=lambda m: m["env_steps"]) if reached else None
 
-    lines = [f"# EfficientZero vs DQN -- {game}", "",
+    lines = [f"# EfficientZero vs REINFORCE -- {game}", "",
              "| checkpoint | agent | env steps | grad steps | score (mean +/- std) | train wallclock |",
              "|---|---|---|---|---|---|"]
     for m in metrics:
@@ -169,17 +169,17 @@ def main():
         lines += ["", f"**EfficientZero best**: {best_ez['return_mean']:.1f} after {best_ez['env_steps']:,} env steps."]
         if matched and matched["env_steps"] > best_ez["env_steps"]:
             factor = matched["env_steps"] / max(1, best_ez["env_steps"])
-            lines.append(f"**DQN needed {matched['env_steps']:,} env steps to match it -- {factor:.0f}x more data.**")
+            lines.append(f"**REINFORCE needed {matched['env_steps']:,} env steps to match it -- {factor:.0f}x more data.**")
         elif matched:
-            lines.append(f"**DQN matched it at {matched['env_steps']:,} env steps.**")
+            lines.append(f"**REINFORCE matched it at {matched['env_steps']:,} env steps.**")
         else:
-            lines.append("**DQN never matched that score within the training budget shown here.**")
+            lines.append("**REINFORCE never matched that score within the training budget shown here.**")
     with open(os.path.join(out, "metrics.md"), "w") as f:
         f.write("\n".join(lines) + "\n")
 
     plots.learning_curves(
         os.path.join(ez_run, "train_log.csv"),
-        os.path.join(dqn_run, "train_log.csv"),
+        os.path.join(reinforce_run, "train_log.csv"),
         os.path.join(out, "learning_curves.png"),
         checkpoints=[p["ez"]["steps"] for p in plan],
         game=game,
@@ -199,7 +199,7 @@ def main():
         fps = int(cfg.demo.fps)
         segments = []
         intro = compose.title_card(
-            f"EfficientZero vs DQN -- {game}",
+            f"EfficientZero vs REINFORCE -- {game}",
             "same environment, same budget, radically different sample efficiency",
             size, 4.0, fps, os.path.join(out, "_cards", "intro.mp4"),
             bullets=("EfficientZero = MuZero + self-supervised consistency + value prefix + off-policy correction",),
@@ -213,12 +213,12 @@ def main():
             )
             segments += [card, clip]
         card = compose.title_card(
-            "DQN, finally converged",
-            f"it took {dqn_final['env_steps']:,} env steps to get here",
-            size, 3.0, fps, os.path.join(out, "_cards", "dqn_final.mp4"),
-            bullets=(f"score {dqn_final_m['return_mean']:.1f}",),
+            "REINFORCE, finally converged",
+            f"it took {reinforce_final['env_steps']:,} env steps to get here",
+            size, 3.0, fps, os.path.join(out, "_cards", "reinforce_final.mp4"),
+            bullets=(f"score {reinforce_final_m['return_mean']:.1f}",),
         )
-        segments += [card, metrics[-2]["video"] if showcase else dqn_final_m["video"]]
+        segments += [card, reinforce_final_m["video"]]
         if showcase:
             card = compose.title_card(
                 "Inside the planner",

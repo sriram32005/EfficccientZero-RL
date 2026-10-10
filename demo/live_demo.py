@@ -3,9 +3,9 @@
     # converged EfficientZero, live, in a window
     python -m demo.live_demo --ckpt runs/ez_pong/checkpoints/ez_final.pt
 
-    # EfficientZero and DQN side by side, same seed
+    # EfficientZero and REINFORCE side by side, same seed
     python -m demo.live_demo --ckpt runs/ez_pong/checkpoints/ez_final.pt \
-                             --ckpt2 runs/dqn_pong/checkpoints/dqn_final.pt
+                             --ckpt2 runs/reinforce_pong/checkpoints/reinforce_final.pt
 
     # no display available (projector-safe): render straight to mp4
     python -m demo.live_demo --ckpt ... --headless --out demo_out/live.mp4
@@ -86,7 +86,7 @@ class LivePlayer:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", required=True)
-    ap.add_argument("--ckpt2", default=None, help="second agent to run side by side (usually DQN)")
+    ap.add_argument("--ckpt2", default=None, help="second agent to run side by side (usually REINFORCE)")
     ap.add_argument("--sims", type=int, default=None, help="MCTS simulations per move (EfficientZero)")
     ap.add_argument("--seed", type=int, default=7)
     ap.add_argument("--fps", type=float, default=15.0)

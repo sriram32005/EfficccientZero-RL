@@ -1,5 +1,5 @@
 # Pong is the recommended demo game: EfficientZero is near-optimal at ~100k env steps,
-# while DQN needs millions -- the contrast is obvious to a room full of people.
+# while REINFORCE needs millions -- the contrast is obvious to a room full of people.
 _base_: base.yaml
 
 env:
@@ -7,11 +7,16 @@ env:
 
 ez:
   total_env_steps: 120000
-  checkpoints: [20000, 50000, 100000]
+  checkpoints: [20000, 50000, 100000, 120000]
 
-dqn:
+# dqn:
+#   total_env_steps: 3000000
+#   checkpoints: [20000, 50000, 100000, 1000000, 2000000, 3000000]
+
+reinforce:
   total_env_steps: 3000000
-  checkpoints: [20000, 50000, 100000, 1000000, 2000000, 3000000]
+  checkpoints: [20000, 50000, 100000, 120000, 1000000, 2000000, 3000000]
 
 demo:
-  dqn_converged_step: 3000000
+  reinforce_converged_step: 3000000
+  # dqn_converged_step: 3000000

@@ -2,7 +2,7 @@
 
 `agent.act(obs)` returns `(action, info)` where `info` carries everything the demo
 overlay draws: MCTS visit counts, the network's prior policy, per-action Q values and
-the root value for EfficientZero; Q values for DQN.
+the root value for EfficientZero; policy distribution for REINFORCE; Q values for DQN.
 """
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from ..common.utils import get_device
 from ..dqn.model import DQNNet
 from ..efficientzero.mcts import MCTS, select_action
 from ..efficientzero.model import EfficientZeroNet
+from ..reinforce.model import ReinforceNet
 
 
 def load_checkpoint(path, device=None):
@@ -92,20 +93,63 @@ class DQNAgent:
         return action, info
 
 
+class REINFORCEAgent:
+    name = "REINFORCE"
+
+    def __init__(self, ckpt_path, device=None, seed=0, greedy=False):
+        self.device = device or get_device("auto")
+        self.greedy = bool(greedy)
+        ckpt = load_checkpoint(ckpt_path, self.device)
+        self.cfg = ckpt["cfg"]
+        self.env_steps = int(ckpt["env_steps"])
+        self.training_steps = int(ckpt.get("training_steps", 0))
+        self.wallclock_s = float(ckpt.get("wallclock_s", 0.0))
+        self.obs_shape = tuple(ckpt["obs_shape"])
+        self.action_space_size = int(ckpt["action_space_size"])
+        self.model = ReinforceNet(self.obs_shape, self.action_space_size).to(self.device)
+        self.model.load_state_dict(ckpt["model"])
+        self.model.eval()
+        self.rng = np.random.default_rng(seed)
+
+    @torch.no_grad()
+    def act(self, obs):
+        logits, value = self.model(torch.as_tensor(obs[None], dtype=torch.uint8, device=self.device))
+        probs = torch.softmax(logits, dim=-1)[0].double().cpu().numpy()
+        probs = probs / probs.sum()
+        # Sample from pi (the policy that was trained). Pure argmax of a policy-gradient net
+        # collapses to a single fixed action whenever the policy is still near-uniform.
+        action = int(np.argmax(probs)) if self.greedy else int(self.rng.choice(len(probs), p=probs))
+        info = {
+            "policy": probs,
+            "root_value": float(value[0, 0].item()),
+            "action": action,
+        }
+        return action, info
+
+
 def load_agent(ckpt_path, device=None, **kwargs):
     ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
     agent_type = ckpt.get("agent", "ez")
     del ckpt
     if agent_type == "ez":
         return EZAgent(ckpt_path, device=device, **{k: v for k, v in kwargs.items() if k in ("num_simulations", "temperature", "seed")})
+    if agent_type == "reinforce":
+        return REINFORCEAgent(ckpt_path, device=device, **{k: v for k, v in kwargs.items() if k in ("seed", "greedy")})
     return DQNAgent(ckpt_path, device=device, **{k: v for k, v in kwargs.items() if k in ("epsilon", "seed")})
 
 
 def make_eval_env(cfg, agent_type: str, seed: int = 0, render: bool = True):
     from ..common.atari_wrappers import make_atari
 
-    size = cfg.env.size if agent_type == "ez" else cfg.dqn.size
-    stack = cfg.env.stack if agent_type == "ez" else cfg.dqn.stack
+    if agent_type == "ez":
+        size = cfg.env.size
+        stack = cfg.env.stack
+    elif agent_type == "reinforce":
+        size = cfg.reinforce.size
+        stack = cfg.reinforce.stack
+    else:
+        size = cfg.dqn.size
+        stack = cfg.dqn.stack
     return make_atari(
         game=cfg.env.game,
         size=size,

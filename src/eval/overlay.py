@@ -2,7 +2,7 @@
 
 For EfficientZero this shows the MCTS visit-count distribution (the searched, improved
 policy), the raw network prior, the per-action Q values and the root value -- i.e. the
-actual decision the planner made. For DQN there is no search, so it shows Q values.
+actual decision the planner made. For REINFORCE there is no search, so it shows the policy distribution.
 """
 from __future__ import annotations
 
@@ -102,6 +102,13 @@ def render_frame(
         y = _bar_chart(panel, y, np.asarray(info["q_values"], dtype=np.float32), labels, chosen, "Q(s,a) from search", (150, 130, 220), "{:+.2f}")
         _text(panel, f"root value V(s) = {info['root_value']:+.3f}", (14, y + 6), 0.50, FG)
         _text(panel, f"{info.get('num_simulations', 0)} simulations / move", (14, y + 24), 0.44, MUTED)
+        y += 40
+    elif "policy" in info and "q_values" not in info:
+        # REINFORCE: show the learned policy distribution
+        policy = np.asarray(info["policy"], dtype=np.float32)
+        y = _bar_chart(panel, y, policy, labels, chosen, "policy pi(a|s) -- single forward pass", ACCENT2, "{:.0%}")
+        _text(panel, f"V(s) = {info['root_value']:+.3f}", (14, y + 6), 0.50, FG)
+        _text(panel, "no search: greedy over policy", (14, y + 24), 0.44, MUTED)
         y += 40
     else:
         q = np.asarray(info["q_values"], dtype=np.float32)

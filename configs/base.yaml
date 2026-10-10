@@ -75,27 +75,50 @@ ez:
   checkpoints: [20000, 50000, 100000]
 
 # -------------------------------------------------------------------------------------
-# DQN (double + dueling + n-step) -- the model-free baseline
+# DQN (double + dueling + n-step) -- the model-free baseline  [COMMENTED OUT]
 # -------------------------------------------------------------------------------------
-dqn:
+# dqn:
+#   size: 84
+#   stack: 4
+#   dueling: true
+#   n_step: 3
+#   gamma: 0.99
+#   lr: 0.0001
+#   batch_size: 32
+#   buffer_capacity: 200000
+#   learning_starts: 20000
+#   train_freq: 4
+#   target_update_interval: 2000  # gradient steps
+#   exploration_steps: 250000
+#   final_epsilon: 0.01
+#   max_grad_norm: 10
+#   total_env_steps: 3000000
+#   eval_interval: 100000
+#   eval_episodes: 3
+#   log_interval: 1000
+#   checkpoints: [20000, 50000, 100000, 3000000]
+
+# -------------------------------------------------------------------------------------
+# REINFORCE (vanilla policy gradient with baseline) -- the model-free baseline
+# -------------------------------------------------------------------------------------
+reinforce:
   size: 84
   stack: 4
-  dueling: true
-  n_step: 3
+  num_envs: 16            # parallel envs -> far less noisy gradient than 1 episode at a time
+  rollout_length: 8       # steps per env per update (batch = num_envs * rollout_length)
   gamma: 0.99
-  lr: 0.0001
-  batch_size: 32
-  buffer_capacity: 200000
-  learning_starts: 20000
-  train_freq: 4
-  target_update_interval: 2000  # gradient steps
-  exploration_steps: 250000
-  final_epsilon: 0.01
-  max_grad_norm: 10
+  gae_lambda: 0.95
+  optimizer: rmsprop      # rmsprop | adam
+  lr: 0.0007
+  lr_decay: true          # linear decay to 0 over total_env_steps
+  entropy_coeff: 0.01
+  value_coeff: 0.5
+  max_grad_norm: 0.5
+  normalize_advantage: true
   total_env_steps: 3000000
   eval_interval: 100000
   eval_episodes: 3
-  log_interval: 1000
+  log_interval: 10000
   checkpoints: [20000, 50000, 100000, 3000000]
 
 # -------------------------------------------------------------------------------------
@@ -107,17 +130,21 @@ demo:
   seed: 11
   episodes_per_checkpoint: 3
   showcase_simulations: 100     # deeper search for the final "inside the planner" clip
-  dqn_converged_step: 3000000
+  reinforce_converged_step: 3000000
+  # dqn_converged_step: 3000000
   pairs:
     - name: early-learning
       ez_step: 20000
-      dqn_step: 20000
-      note: "20k env steps: EfficientZero is already tracking the ball, DQN is still random"
+      reinforce_step: 20000
+      # dqn_step: 20000
+      note: "20k env steps: EfficientZero is already tracking the ball, REINFORCE is still random"
     - name: mid-training
       ez_step: 50000
-      dqn_step: 50000
-      note: "50k env steps: EfficientZero rallies, DQN has barely moved off the floor"
+      reinforce_step: 50000
+      # dqn_step: 50000
+      note: "50k env steps: EfficientZero rallies, REINFORCE has barely moved off the floor"
     - name: efficientzero-converged
       ez_step: 100000
-      dqn_step: 100000
-      note: "100k env steps: EfficientZero plays near-optimally, DQN still cannot return the ball"
+      reinforce_step: 100000
+      # dqn_step: 100000
+      note: "100k env steps: EfficientZero plays near-optimally, REINFORCE still cannot return the ball"

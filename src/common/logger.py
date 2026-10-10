@@ -10,21 +10,38 @@ from .utils import Timer, ensure_dir
 
 
 class CSVLogger:
+    """CSV writer that tolerates rows with new columns appearing later.
+
+    (The old version froze the header on the first row, so columns that first show up
+    later -- e.g. `eval_return` -- were silently dropped and the learning curves came out empty.)
+    """
+
     def __init__(self, path: str):
         ensure_dir(os.path.dirname(os.path.abspath(path)))
         self.path = path
-        self.fields = None
+        self.fields: list = []
+        self.rows: list = []
         self._fh = None
         self._writer = None
 
+    def _rewrite(self):
+        if self._fh:
+            self._fh.close()
+        self._fh = open(self.path, "w", newline="")
+        self._writer = csv.DictWriter(self._fh, fieldnames=self.fields, restval="")
+        self._writer.writeheader()
+        for r in self.rows:
+            self._writer.writerow(r)
+        self._fh.flush()
+
     def log(self, row: dict) -> None:
-        if self._fh is None:
-            self.fields = list(row.keys())
-            self._fh = open(self.path, "w", newline="")
-            self._writer = csv.DictWriter(self._fh, fieldnames=self.fields)
-            self._writer.writeheader()
-        clean = {k: row.get(k, "") for k in self.fields}
-        self._writer.writerow(clean)
+        new_cols = [k for k in row if k not in self.fields]
+        self.rows.append(dict(row))
+        if new_cols or self._fh is None:
+            self.fields.extend(new_cols)
+            self._rewrite()  # header changed -> rewrite file with the widened header
+            return
+        self._writer.writerow(row)
         self._fh.flush()
 
     def close(self):
